@@ -187,12 +187,118 @@ def calculate_monthly_vat_breakdown(df):
     return monthly_data
 
 
-def generate_summary_report(df):
+def separate_by_consignment_value(df, threshold=150):
     """
-    Generate comprehensive summary report
+    Separate data by consignment value threshold
 
     Args:
         df: Preprocessed DataFrame
+        threshold: Consignment value threshold (default 150)
+
+    Returns:
+        Tuple of (df_low, df_high) DataFrames
+    """
+    df_low = df[df['Consignment Value'] <= threshold].copy()
+    df_high = df[df['Consignment Value'] > threshold].copy()
+
+    return df_low, df_high
+
+
+def calculate_vat_by_consignment_category(df, threshold=150):
+    """
+    Calculate VAT by country, separated by consignment value
+
+    Args:
+        df: Preprocessed DataFrame
+        threshold: Consignment value threshold (default 150)
+
+    Returns:
+        Dictionary with 'low' and 'high' value DataFrames
+    """
+    df_low, df_high = separate_by_consignment_value(df, threshold)
+
+    return {
+        'low_value': {
+            'threshold': f'<=€{threshold}',
+            'data': calculate_vat_by_country(df_low),
+            'total_vat': calculate_total_vat(df_low),
+            'count': len(df_low)
+        },
+        'high_value': {
+            'threshold': f'>€{threshold}',
+            'data': calculate_vat_by_country(df_high),
+            'total_vat': calculate_total_vat(df_high),
+            'count': len(df_high)
+        }
+    }
+
+
+def calculate_returns_by_consignment_category(df, threshold=150, commission_rate=0.2, ie_commission_rate=0.3):
+    """
+    Calculate returns and revenue by consignment value category
+
+    Args:
+        df: Preprocessed DataFrame
+        threshold: Consignment value threshold (default 150)
+        commission_rate: Default commission rate (20%)
+        ie_commission_rate: Commission rate for Ireland (30%)
+
+    Returns:
+        Dictionary with 'low' and 'high' value DataFrames
+    """
+    df_low, df_high = separate_by_consignment_value(df, threshold)
+
+    return {
+        'low_value': {
+            'threshold': f'<=€{threshold}',
+            'data': calculate_returns_and_revenue(df_low, commission_rate, ie_commission_rate),
+            'total_revenue': calculate_returns_and_revenue(df_low, commission_rate, ie_commission_rate)['DR Revenue'].sum(),
+            'count': len(df_low[df_low['Line Item Quantity Returned'] > 0])
+        },
+        'high_value': {
+            'threshold': f'>€{threshold}',
+            'data': calculate_returns_and_revenue(df_high, commission_rate, ie_commission_rate),
+            'total_revenue': calculate_returns_and_revenue(df_high, commission_rate, ie_commission_rate)['DR Revenue'].sum(),
+            'count': len(df_high[df_high['Line Item Quantity Returned'] > 0])
+        }
+    }
+
+
+def calculate_monthly_breakdown_by_consignment(df, threshold=150):
+    """
+    Calculate monthly breakdown separated by consignment value
+
+    Args:
+        df: Preprocessed DataFrame with 'Month' column
+        threshold: Consignment value threshold (default 150)
+
+    Returns:
+        Dictionary with monthly data for each consignment category
+    """
+    if 'Month' not in df.columns:
+        raise ValueError("DataFrame must have a 'Month' column. Ensure dates are parsed.")
+
+    df_low, df_high = separate_by_consignment_value(df, threshold)
+
+    return {
+        'low_value': {
+            'threshold': f'<=€{threshold}',
+            'monthly_data': calculate_monthly_vat_breakdown(df_low)
+        },
+        'high_value': {
+            'threshold': f'>€{threshold}',
+            'monthly_data': calculate_monthly_vat_breakdown(df_high)
+        }
+    }
+
+
+def generate_summary_report(df, threshold=150):
+    """
+    Generate comprehensive summary report with consignment value separation
+
+    Args:
+        df: Preprocessed DataFrame
+        threshold: Consignment value threshold (default 150)
 
     Returns:
         Dictionary with all key metrics
@@ -201,15 +307,22 @@ def generate_summary_report(df):
     returns_revenue = calculate_returns_and_revenue(df)
     total_vat = calculate_total_vat(df)
 
+    # Add consignment value segmentation
+    vat_by_consignment = calculate_vat_by_consignment_category(df, threshold)
+    returns_by_consignment = calculate_returns_by_consignment_category(df, threshold)
+
     summary = {
         'total_vat_paid': total_vat,
         'total_revenue': returns_revenue['DR Revenue'].sum(),
         'vat_by_country': vat_by_country,
-        'returns_and_revenue': returns_revenue
+        'returns_and_revenue': returns_revenue,
+        'vat_by_consignment_value': vat_by_consignment,
+        'returns_by_consignment_value': returns_by_consignment
     }
 
     if 'Month' in df.columns:
         summary['monthly_breakdown'] = calculate_monthly_vat_breakdown(df)
+        summary['monthly_by_consignment'] = calculate_monthly_breakdown_by_consignment(df, threshold)
 
     return summary
 
@@ -245,8 +358,8 @@ if __name__ == "__main__":
     # Load and preprocess
     df = load_and_preprocess_data(csv_path)
 
-    # Generate full report
-    summary = generate_summary_report(df)
+    # Generate full report with consignment value separation
+    summary = generate_summary_report(df, threshold=150)
 
     print("\n" + "="*80)
     print("SUMMARY REPORT")
@@ -260,6 +373,47 @@ if __name__ == "__main__":
     print("\n\nRETURNS & REVENUE BY COUNTRY:")
     print(summary['returns_and_revenue'].to_string(index=False))
 
+    # Print consignment value breakdown
+    print("\n" + "="*80)
+    print("BREAKDOWN BY CONSIGNMENT VALUE")
+    print("="*80)
+
+    for category in ['low_value', 'high_value']:
+        vat_cat = summary['vat_by_consignment_value'][category]
+        ret_cat = summary['returns_by_consignment_value'][category]
+
+        print(f"\n{'='*80}")
+        print(f"CONSIGNMENT VALUE: {vat_cat['threshold']}")
+        print(f"{'='*80}")
+        print(f"Total Consignments: {vat_cat['count']}")
+        print(f"Total VAT Paid: €{vat_cat['total_vat']:.2f}")
+        print(f"Total Returns: {ret_cat['count']}")
+        print(f"Total DR Revenue: €{ret_cat['total_revenue']:.2f}")
+
+        print(f"\nVAT by Country ({vat_cat['threshold']}):")
+        if not vat_cat['data'].empty:
+            print(vat_cat['data'].to_string(index=False))
+        else:
+            print("No data")
+
+        print(f"\nReturns & Revenue ({ret_cat['threshold']}):")
+        if not ret_cat['data'].empty:
+            print(ret_cat['data'].to_string(index=False))
+        else:
+            print("No returns")
+
     # Print monthly breakdown if available
     if 'monthly_breakdown' in summary:
+        print("\n" + "="*80)
+        print("MONTHLY BREAKDOWN (ALL CONSIGNMENTS)")
+        print("="*80)
         print_monthly_report(summary['monthly_breakdown'])
+
+        # Monthly breakdown by consignment value
+        if 'monthly_by_consignment' in summary:
+            for category in ['low_value', 'high_value']:
+                cat_data = summary['monthly_by_consignment'][category]
+                print(f"\n{'='*80}")
+                print(f"MONTHLY BREAKDOWN - {cat_data['threshold']}")
+                print(f"{'='*80}")
+                print_monthly_report(cat_data['monthly_data'])
