@@ -56,7 +56,7 @@ class HighValueProcessor:
         Services.store_hv_data(df, vat_per_country, vat_difference_table, return_vat_per_country,
                              combined_refunds, DR_revenue_table)
 
-        return [[vat_to_return_from_nl, DR_revenue_hv, vat_difference_payment_txt, vat_to_pay_total], [vat_per_country, return_duty_amount, return_vat_per_country]]
+        return [[vat_to_return_from_nl, DR_revenue_hv, vat_difference_payment_txt, vat_to_pay_total], [vat_per_country, duty_returned_by_country, return_vat_per_country]]
 
     @staticmethod
     def calculate_vat_difference_payment_txt(df: pd.DataFrame) -> str:

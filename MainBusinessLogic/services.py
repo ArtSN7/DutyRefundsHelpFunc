@@ -141,3 +141,89 @@ class Services:
 
         return summary
 
+    @staticmethod
+    def create_financial_summary(
+        dutch_vat_return: pd.DataFrame,
+        oss_detailed: pd.DataFrame,
+        duty_return: pd.DataFrame
+    ) -> pd.DataFrame:
+        """
+        Create financial summary from VAT return forms.
+        
+        Args:
+            dutch_vat_return: Dutch VAT Return form
+            oss_detailed: OSS VAT Return detailed form
+            duty_return: Duty Return Claim form
+            
+        Returns:
+            DataFrame with financial summary
+        """
+        data_dir = Path("vat_returns")
+        data_dir.mkdir(exist_ok=True)
+        
+        # 1. OSS VAT DUE (sum of Net VAT Due from OSS return)
+        oss_vat_due = oss_detailed['Net VAT Due'].sum() if len(oss_detailed) > 0 else 0
+        
+        # 2. Net VAT from Dutch Return (row 3a - "Output VAT - Input VAT")
+        # Find the row with '3a. Output VAT - Input VAT'
+        dutch_net_row = dutch_vat_return[dutch_vat_return['Section'] == '3a. Output VAT - Input VAT']
+        if len(dutch_net_row) > 0:
+            dutch_net_str = dutch_net_row['Amount (€)'].values[0]
+            # Remove commas and convert to float
+            dutch_net_vat = float(dutch_net_str.replace(',', ''))
+        else:
+            dutch_net_vat = 0
+        
+        # 3. Duty Revenue (80% for most countries, 70% for Ireland)
+        if len(duty_return) > 0:
+            duty_return_copy = duty_return.copy()
+            duty_return_copy['Duty Revenue'] = duty_return_copy.apply(
+                lambda row: row['Total Duty Returned'] * 0.70 if row['Country'] == 'IE'
+                else row['Total Duty Returned'] * 0.80,
+                axis=1
+            )
+            duty_revenue_total = duty_return_copy['Duty Revenue'].sum()
+        else:
+            duty_revenue_total = 0
+        
+        # Create summary table
+        summary_data = {
+            'Financial Item': [
+                'VAT to Pay to OSS (HV parcels to other EU countries)',
+                'Net VAT from Dutch Return (IOSS + NL operations)',
+                'Duty Returned To Pro Carrier (80% general, 70% IE)',
+                '',
+                'TOTAL AMOUNTS'
+            ],
+            'Amount (€)': [
+                f'{oss_vat_due:,.2f}',
+                f'{dutch_net_vat:,.2f}',
+                f'{duty_revenue_total:,.2f}',
+                '',
+                ''
+            ],
+            'Description': [
+                'Payment due for OSS quarterly return (HV parcels shipped to other EU countries)',
+                'Amount to claim from broker (positive) or pay (negative) - includes IOSS VAT, NL returns, and broker import VAT',
+                'Revenue from duty refunds claimed from customs (company share)',
+                '',
+                'Summary of key financial movements'
+            ]
+        }
+        
+        financial_summary = pd.DataFrame(summary_data)
+        
+        # Save to Excel
+        financial_summary.to_excel(
+            data_dir / "financial_summary_from_returns.xlsx",
+            index=False,
+            engine='openpyxl'
+        )
+        
+        print(f"\n💰 Financial Summary:")
+        print(f"   📊 OSS VAT Due: €{oss_vat_due:,.2f}")
+        print(f"   📊 Dutch Net VAT: €{dutch_net_vat:,.2f}")
+        print(f"   📊 Duty Revenue: €{duty_revenue_total:,.2f}")
+        
+        return financial_summary
+

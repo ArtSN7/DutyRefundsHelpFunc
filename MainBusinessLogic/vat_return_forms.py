@@ -4,6 +4,7 @@ import pandas as pd
 from pathlib import Path
 from typing import Tuple, Dict, Any
 from datetime import datetime
+from services import Services
 
 
 class VATReturnForms:
@@ -258,9 +259,6 @@ class VATReturnForms:
                 'Country': [],
                 'Total Returned Value': [],
                 'Total Duty Returned': [],
-                'Claim Type': [],
-                'Deadline': [],
-                'Submitted To': []
             })
         
         duty_returns = hv_data['duty_returned_by_country']
@@ -272,27 +270,17 @@ class VATReturnForms:
                 'Country': [],
                 'Total Returned Value': [],
                 'Total Duty Returned': [],
-                'Claim Type': [],
-                'Deadline': [],
-                'Submitted To': []
             })
         
         # FIX: Make a copy to avoid modifying original
         duty_returns = duty_returns.copy()
-        
-        # Add claim information
-        duty_returns['Claim Type'] = 'E-commerce Return'
-        duty_returns['Deadline'] = '90 days from import'
-        duty_returns['Submitted To'] = 'Dutch Customs'
+
         
         # Reorder columns
         form = duty_returns[[
             'Country',
             'Total Returned Value',
             'Total Duty Returned',
-            'Claim Type',
-            'Deadline',
-            'Submitted To'
         ]]
         
         return form
@@ -351,3 +339,8 @@ class VATReturnForms:
         print(f"   📄 Dutch VAT Return: {forms_dir / f'DUTCH_VAT_RETURN_{return_period.replace(' ', '_')}.xlsx'}")
         print(f"   📄 OSS VAT Return: {forms_dir / f'OSS_VAT_RETURN_{return_period.replace(' ', '_')}.xlsx'}")
         print(f"   📄 Duty Return Claim: {forms_dir / f'DUTY_RETURN_CLAIM_{return_period.replace(' ', '_')}.xlsx'}")
+        
+        # Generate financial summary from the forms
+        print("\n💰 Generating Financial Summary...")
+        Services.create_financial_summary(dutch_vat_return, oss_detailed, duty_return)
+        print(f"   📄 Financial Summary: data/financial_summary_from_returns.xlsx")

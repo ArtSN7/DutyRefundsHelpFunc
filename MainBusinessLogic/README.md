@@ -41,6 +41,11 @@ vat_analysis/
    - Separate customs claim
    - Duty refunds by country
 
+4. **financial_summary_from_returns.xlsx** ✨ NEW
+   - OSS VAT payment due
+   - Dutch VAT net position (to claim from broker)
+   - Duty revenue to Pro Carrier (80% general, 70% IE)
+
 ## 📋 Input Data Fields
 
 Your CSV must have these columns:
