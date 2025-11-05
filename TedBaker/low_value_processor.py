@@ -34,7 +34,7 @@ class LowValueProcessor:
         # Save reports to CSV files
         Services.store_lv_data(df, vat_per_country, return_vat_per_country, DR_revenue_table)
 
-        return [DR_revenue, PC_return, total_vat_needs_to_be_collected_from_returns, total_import_vat_paid]
+        return [[DR_revenue, PC_return, total_vat_needs_to_be_collected_from_returns, total_import_vat_paid], [vat_per_country, return_vat_per_country]]
 
     @staticmethod
     def clean_columns(df: pd.DataFrame) -> pd.DataFrame:

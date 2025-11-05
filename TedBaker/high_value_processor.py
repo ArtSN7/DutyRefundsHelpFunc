@@ -27,7 +27,7 @@ class HighValueProcessor:
         """
         df = HighValueProcessor.clean_columns(df)
 
-        # Calculate VAT to return from NL
+        # Calculate import VAT that was paid by broker to return from NL
         vat_to_return_from_nl = HighValueProcessor.calculate_vat_to_return_from_nl(df)
 
         # Calculate VAT per country to submit to NL
@@ -56,7 +56,7 @@ class HighValueProcessor:
         Services.store_hv_data(df, vat_per_country, vat_difference_table, return_vat_per_country,
                              combined_refunds, DR_revenue_table)
 
-        return [vat_to_return_from_nl, DR_revenue_hv, vat_difference_payment_txt, vat_to_pay_total]
+        return [[vat_to_return_from_nl, DR_revenue_hv, vat_difference_payment_txt, vat_to_pay_total], [vat_per_country, return_duty_amount, return_vat_per_country]]
 
     @staticmethod
     def calculate_vat_difference_payment_txt(df: pd.DataFrame) -> str:
@@ -145,6 +145,7 @@ class HighValueProcessor:
     @staticmethod
     def calculate_vat_per_country(df: pd.DataFrame) -> pd.DataFrame:
         """Calculate VAT per country."""
+        df = df[df['Consignee Country'] != 'NL']  # Exclude NL shipments
         return Services.calculate_vat_per_country(df)
 
     @staticmethod
@@ -183,6 +184,8 @@ class HighValueProcessor:
     def calculate_vat_to_return_from_nl(df: pd.DataFrame) -> float:
         """Calculate total NL VAT to be returned."""
         unique_consignments = df.drop_duplicates(subset=['MRN'])
+        # remove everything shipped to NL, as VAT was already been paid
+        unique_consignments = unique_consignments[unique_consignments['Consignee Country'] != 'NL']
         unique_consignments['VAT Amount'] = unique_consignments['Consignment Value'] * Config.NL_VAT_RATE
         total_nl_vat = unique_consignments['VAT Amount'].sum()
         return total_nl_vat

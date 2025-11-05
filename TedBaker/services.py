@@ -1,7 +1,8 @@
 """Shared services for VAT calculations and data storage."""
 
 import pandas as pd
-from typing import Any
+from pathlib import Path
+import os
 
 import warnings
 warnings.filterwarnings('ignore', category=pd.errors.SettingWithCopyWarning)
@@ -12,25 +13,39 @@ class Services:
 
     @staticmethod
     def store_lv_data(lv_consignments, vat_per_country, return_vat_per_country, DR_revenue_table) -> None:
-        """Save low value consignment data to CSV files."""
-        lv_consignments.to_csv("lv_consignments_data.csv", index=False)
-        vat_per_country.to_csv("lv_vat_per_country_summary.csv", index=False)
-        return_vat_per_country.to_csv("lv_returned_vat_per_country_summary.csv", index=False)
-        DR_revenue_table.to_csv("lv_DR_revenue_summary.csv", index=False)
+        """Save low value consignment data to Excel files."""
+        # Create data directory if it doesn't exist
+        data_dir = Path("data")
+        data_dir.mkdir(exist_ok=True)
+
+        # Save all dataframes to Excel format
+        lv_consignments.to_excel(data_dir / "lv_consignments_data.xlsx", index=False, engine='openpyxl')
+        vat_per_country.to_excel(data_dir / "lv_vat_per_country_summary.xlsx", index=False, engine='openpyxl')
+        return_vat_per_country.to_excel(data_dir / "lv_returned_vat_per_country_summary.xlsx", index=False, engine='openpyxl')
+        DR_revenue_table.to_excel(data_dir / "lv_DR_revenue_summary.xlsx", index=False, engine='openpyxl')
 
     @staticmethod
     def store_hv_data(hv_consignments, vat_per_country, vat_difference_table, return_vat_per_country,
                       combined_refunds, DR_revenue_table) -> None:
-        """Save high value consignment data to CSV files."""
-        hv_consignments.to_csv("hv_consignments_data.csv", index=False)
-        vat_per_country.to_csv("hv_vat_per_country_summary.csv", index=False)
-        vat_difference_table.to_csv("hv_vat_difference_summary.csv", index=False)
-        return_vat_per_country.to_csv("hv_returned_vat_per_country_summary.csv", index=False)
-        combined_refunds.to_csv("hv_duty_and_vat__returned_values_summary.csv", index=False)
-        DR_revenue_table.to_csv("hv_DR_revenue_summary.csv", index=False)
+        """Save high value consignment data to Excel files."""
+        # Create data directory if it doesn't exist
+        data_dir = Path("data")
+        data_dir.mkdir(exist_ok=True)
+
+        # Save all dataframes to Excel format
+        hv_consignments.to_excel(data_dir / "hv_consignments_data.xlsx", index=False, engine='openpyxl')
+        vat_per_country.to_excel(data_dir / "hv_vat_per_country_summary.xlsx", index=False, engine='openpyxl')
+        vat_difference_table.to_excel(data_dir / "hv_vat_difference_summary.xlsx", index=False, engine='openpyxl')
+        return_vat_per_country.to_excel(data_dir / "hv_returned_vat_per_country_summary.xlsx", index=False, engine='openpyxl')
+        combined_refunds.to_excel(data_dir / "hv_duty_and_vat_returned_values_summary.xlsx", index=False, engine='openpyxl')
+        DR_revenue_table.to_excel(data_dir / "hv_DR_revenue_summary.xlsx", index=False, engine='openpyxl')
 
     @staticmethod
     def summary_table(lv_list, hv_list):
+
+        data_dir = Path("data")
+        data_dir.mkdir(exist_ok=True)
+
         """Create and save summary tables combining low and high value data."""
         # Extract values from lists
         lv_dr_revenue = lv_list[0]
@@ -76,8 +91,9 @@ class Services:
         })
 
         # Save both tables to CSV
-        summary_df.to_csv("summary_revenue_table.csv", index=False)
-        additional_info.to_csv("summary_additional_info.csv", index=False)
+        summary_df.to_excel(data_dir / "summary_revenue_table.xlsx", index=False, engine='openpyxl')
+
+        additional_info.to_excel(data_dir / "summary_additional_info.xlsx", index=False, engine='openpyxl')
 
     @staticmethod
     def calculate_vat_per_country(df: pd.DataFrame) -> pd.DataFrame:

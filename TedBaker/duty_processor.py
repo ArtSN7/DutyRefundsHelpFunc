@@ -34,8 +34,6 @@ class DutyProcessor:
         # Summary of parsing
         total_rows = len(df)
         parsed_count = df['Duty_rate'].notna().sum()
-        unparsed_count = total_rows - parsed_count
-        print(f"Duty parsing: {parsed_count}/{total_rows} parsed, {unparsed_count} unparsed (set as NaN).")
 
         # Pick the biggest (max) duty rate per 4-digit goods code
         max_duty = df.groupby('Goods_Code_4')['Duty_rate'].max()

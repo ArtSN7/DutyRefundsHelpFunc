@@ -19,21 +19,22 @@ def main():
 
     print("📊 Starting VAT Analysis...")
 
-    # Load and separate data
-    low_value_df, high_value_df = DataLayer.load_data(csv_path)
-
     # Process duty data
     print("📦 Processing duty data...")
     duty_data = pd.read_excel(duty_excel_path)
     duty_dict = DutyProcessor.process_duty_data(duty_data)
 
+    # Load and separate data
+    low_value_df, high_value_df = DataLayer.load_data(csv_path)
+
     # Process low value consignments
     print("💶 Processing low value consignments...")
-    low_values_data = LowValueProcessor.process_low_value_data(low_value_df)
+    # lv_data_for_form = [vat_per_country, return_vat_per_country]
+    low_values_data, lv_data_for_form = LowValueProcessor.process_low_value_data(low_value_df)
 
     # Process high value consignments
     print("💷 Processing high value consignments...")
-    high_values_data = HighValueProcessor.process_high_value_data(high_value_df, duty_dict)
+    high_values_data, hv_data_for_form = HighValueProcessor.process_high_value_data(high_value_df, duty_dict)
 
     # Generate summary
     print("📋 Generating summary...")
