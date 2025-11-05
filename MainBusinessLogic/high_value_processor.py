@@ -93,10 +93,11 @@ class HighValueProcessor:
         """Calculate DR revenue from high value returns (30% IE, 20% others)."""
         revenue_df = combined_refunds.copy()
 
-        # Calculate revenue: 30% for Ireland, 20% for others
+        # Calculate revenue: 30% for Ireland (VAT only, no duty), 20% for others
         revenue_df['Revenue'] = revenue_df.apply(
-            lambda row: row['Total Refund'] * 0.30 if row['Country'] == 'IE'
-            else row['Total Refund'] * 0.20,
+            lambda row: row['Total VAT Refund'] * Config.get_commission_rate(row['Country'])
+            if row['Country'] in Config.DUTY_EXCLUDED_COUNTRIES
+            else row['Total Refund'] * Config.get_commission_rate(row['Country']),
             axis=1
         )
 
@@ -152,6 +153,9 @@ class HighValueProcessor:
     def calculate_duty_for_returned_items(df: pd.DataFrame, duty_dict: Dict[str, float]) -> Tuple[float, pd.DataFrame]:
         """Calculate duty refunds for returned items."""
         returned_df = df[df['Line Item Quantity Returned'] > 0].copy()
+        
+        # EXCLUDE IE - Duty cannot be reclaimed from Ireland
+        returned_df = returned_df[~returned_df['Consignee Country'].isin(Config.DUTY_EXCLUDED_COUNTRIES)]
 
         # Extract first 4 digits from HS CODE
         returned_df['Goods_Code_4'] = returned_df['HS CODE'].astype(str).str[:4]
@@ -179,7 +183,7 @@ class HighValueProcessor:
         total_duty = duty_by_country['Total Duty Returned'].sum()
 
         return total_duty, duty_by_country
-
+    
     @staticmethod
     def calculate_vat_to_return_from_nl(df: pd.DataFrame) -> float:
         """Calculate total NL VAT to be returned."""

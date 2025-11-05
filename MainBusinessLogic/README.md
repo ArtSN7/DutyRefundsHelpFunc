@@ -40,11 +40,18 @@ vat_analysis/
 3. **DUTY_RETURN_CLAIM_Q3_2024.xlsx**
    - Separate customs claim
    - Duty refunds by country
+   - **⚠️ Ireland (IE) excluded** - duty cannot be reclaimed
 
-4. **financial_summary_from_returns.xlsx** ✨ NEW
+4. **DR_REVENUE_DETAILED_Q3_2024.xlsx** ✨ NEW
    - OSS VAT payment due
    - Dutch VAT net position (to claim from broker)
-   - Duty revenue to Pro Carrier (80% general, 70% IE)
+   - Duty revenue to Pro Carrier (80% general, **IE excluded**)
+
+5. **PC_DUTY_REVENUE_Q3_2024.xlsx** ⭐⭐ **NEW**
+   - Pro Carrier revenue breakdown
+   - Low value and high value parcels
+   - Duty revenue (80% general, 70% Ireland)
+   - **⚠️ Ireland (IE) excluded** - duty cannot be reclaimed
 
 ## 📋 Input Data Fields
 
@@ -103,13 +110,67 @@ python main.py
 - DUTCH_VAT_RETURN_Q3_2024.xlsx
 - OSS_VAT_RETURN_Q3_2024.xlsx
 - DUTY_RETURN_CLAIM_Q3_2024.xlsx
+- DR_REVENUE_DETAILED_Q3_2024.xlsx ⭐ **NEW**
+- PC_DUTY_REVENUE_Q3_2024.xlsx ⭐⭐ **NEW**
+- FINANCIAL_SUMMARY.xlsx ⭐
 
 ## 🔧 Configuration
 
-Edit `config.py` to customize:
-- VAT rates by country
-- Commission rates
-- Consignment threshold (default: €150)
+All configuration is centralized in `config.py`:
+
+### VAT Rates
+- Configurable per country
+- NL VAT rate: 21%
+
+### Commission Rates
+- Default: 20% (most countries)
+- Ireland (IE): 30%
+
+### Duty Revenue Rates
+- Default: 80% (company gets 80% of refunded duty)
+- Ireland (IE): 70% (company gets 70% of refunded duty)
+
+### File Paths
+- Input CSV path
+- Duty Excel path
+- Return period
+- Output directories
+
+### Thresholds
+- Consignment threshold: €150 (IOSS vs OSS)
+
+## 📊 Enhanced Revenue Tables
+
+### DR Revenue Table (DR_REVENUE_DETAILED)
+Shows what Duty Refunds gets from VAT returns (commission):
+- **By Country Breakdown**:
+  - LV VAT Refund: VAT refunds from low value returns
+  - LV DR Revenue: Company revenue from LV refunds (20%/30% commission)
+  - HV VAT Refund: VAT refunds from high value returns
+  - HV Duty Refund: Duty refunds from high value returns (IE excluded)
+  - HV DR Revenue: Company revenue from HV refunds (20%/30% commission)
+  - Total VAT Refund: Combined LV + HV VAT refunds
+  - Total DR Revenue: Combined LV + HV revenue (commission only)
+  - Commission Rate: Applied rate (20% or 30%)
+  - Notes: Special notes (e.g., "No duty reclaim" for IE)
+
+### PC Duty Revenue Table (PC_DUTY_REVENUE) ⭐⭐ NEW
+Shows what Pro Carrier gets from duty refunds (100%):
+- **By Country Breakdown**:
+  - HV Duty Refund: Duty refunds from high value returns (IE excluded)
+  - PC Revenue from Duty: Pro Carrier gets 100% of duty refunds
+  - Rate: 100% (full duty refund goes to PC)
+  - Notes: Special notes (e.g., "No duty reclaim" for IE)
+
+**Important Notes**:
+- **VAT Refunds**: Go to customers, with DR taking 20-30% commission
+- **Duty Refunds**: Go 100% to Pro Carrier (no commission)
+- **IE Exclusion**: No duty can be reclaimed from Ireland
+
+**Revenue Split**:
+- DR gets: 20-30% commission on VAT refunds
+- PC gets: 100% of duty refunds
+- Customers get: 70-80% of VAT refunds (remainder after DR commission)
 
 ## 📊 Dutch VAT Return Breakdown
 
@@ -176,7 +237,11 @@ Separate claim to Dutch Customs:
 2. **OSS excludes NL** (NL goes in Dutch VAT Return)
 3. **Duty is separate** from VAT returns
 4. **Returns** = Negative amounts in forms
-5. **Three separate submissions**:
+5. **Ireland (IE) duty exclusion**: Duty cannot be reclaimed from Ireland, so:
+   - IE returns only include VAT refunds (30% commission)
+   - No duty refunds for IE parcels
+   - IE excluded from duty return claim form
+6. **Three separate submissions**:
    - Dutch VAT Return (monthly/quarterly)
    - OSS Return (quarterly only)
    - Duty Return (to customs, not tax office)

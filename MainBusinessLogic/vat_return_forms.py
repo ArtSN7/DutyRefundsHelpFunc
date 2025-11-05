@@ -244,6 +244,7 @@ class VATReturnForms:
         Generate Duty Return Claim form for returned parcels.
         
         This is a SEPARATE claim submitted to Dutch Customs (not tax office).
+        NOTE: Ireland (IE) is EXCLUDED - duty cannot be reclaimed from IE.
         
         Args:
             hv_data: High value data dictionary
@@ -273,15 +274,14 @@ class VATReturnForms:
             })
         
         # FIX: Make a copy to avoid modifying original
-        duty_returns = duty_returns.copy()
-
-        
-        # Reorder columns
         form = duty_returns[[
             'Country',
             'Total Returned Value',
             'Total Duty Returned',
-        ]]
+        ]].copy()
+        
+        # Add note about IE exclusion in the metadata/attrs instead of as a row
+        form.attrs['note'] = 'Ireland (IE) excluded - duty cannot be reclaimed from IE'
         
         return form
     
@@ -297,7 +297,7 @@ class VATReturnForms:
         forms_dir = Path("vat_returns")
         forms_dir.mkdir(exist_ok=True)
         
-        print("\n📝 Generating forms...")
+        print("\n📝 Generating VAT return forms...")
         
         # Generate Dutch VAT Return
         print("   ✅ Dutch VAT Return...")
@@ -343,4 +343,4 @@ class VATReturnForms:
         # Generate financial summary from the forms
         print("\n💰 Generating Financial Summary...")
         Services.create_financial_summary(dutch_vat_return, oss_detailed, duty_return)
-        print(f"   📄 Financial Summary: data/financial_summary_from_returns.xlsx")
+        print(f"   📄 Financial Summary: vat_returns/FINANCIAL_SUMMARY.xlsx")
