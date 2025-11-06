@@ -15,6 +15,11 @@ class Config:
     DEFAULT_COMMISSION_RATE = 0.2  # 20% for most countries
     IE_COMMISSION_RATE = 0.3       # 30% for Ireland
     
+    # Dictionary for easy lookup
+    COMMISSION_RATES = {
+        'IE': IE_COMMISSION_RATE
+    }
+    
     # PC (Pro Carrier) gets the remainder
     DEFAULT_PC_RATE = 0.8  # 80% for most countries (100% - 20%)
     IE_PC_RATE = 0.7       # 70% for Ireland (100% - 30%)

@@ -53,6 +53,25 @@ vat_analysis/
    - Duty revenue (80% general, 70% Ireland)
    - **⚠️ Ireland (IE) excluded** - duty cannot be reclaimed
 
+6. **COMPREHENSIVE_FINANCIAL_BREAKDOWN_Q3_2024.xlsx** ⭐⭐⭐ **NEW**
+   - Complete financial overview with all key metrics
+   - IOSS VAT to Pay for Imports
+   - IOSS VAT for Returns (Credit)
+   - Net IOSS VAT
+   - Broker Import VAT Paid (21% on HV parcels)
+   - VAT to Reclaim from Broker (parcels to other EU)
+   - NL HV Returns VAT (parcels stayed in NL)
+   - OSS VAT to Pay (other EU countries)
+   - OSS VAT Returned (returns from other EU)
+   - Net OSS VAT
+   - Total Duty Returned (all countries, IE excluded)
+   - Total VAT Returned (IOSS + NL + OSS)
+   - DR Fee (commission on VAT returns)
+   - PC Portion from VAT Returns
+   - PC Duty Revenue (100%)
+   - PC Total Revenue
+   - Summary of total refunds to process (VAT + Duty), DR revenue (commission), and PC revenue (remainder + duty)
+
 ## 📋 Input Data Fields
 
 Your CSV must have these columns:
@@ -112,6 +131,7 @@ python main.py
 - DUTY_RETURN_CLAIM_Q3_2024.xlsx
 - DR_REVENUE_DETAILED_Q3_2024.xlsx ⭐ **NEW**
 - PC_DUTY_REVENUE_Q3_2024.xlsx ⭐⭐ **NEW**
+- COMPREHENSIVE_FINANCIAL_BREAKDOWN_Q3_2024.xlsx ⭐⭐⭐ **NEW**
 - FINANCIAL_SUMMARY.xlsx ⭐
 
 ## 🔧 Configuration
@@ -161,6 +181,39 @@ Shows what Pro Carrier gets from duty refunds (100%):
   - PC Revenue from Duty: Pro Carrier gets 100% of duty refunds
   - Rate: 100% (full duty refund goes to PC)
   - Notes: Special notes (e.g., "No duty reclaim" for IE)
+
+### Comprehensive Financial Breakdown ⭐⭐⭐ NEW
+Complete financial overview with all key metrics:
+
+**IOSS Section (Low Value ≤€150)**:
+1. IOSS VAT to Pay for Imports
+2. IOSS VAT for Returns (Credit)
+3. Net IOSS VAT
+
+**Broker Import VAT Section**:
+4. Broker Import VAT Paid (21% on HV parcels)
+5. VAT to Reclaim from Broker (parcels to other EU)
+6. NL HV Returns VAT (parcels stayed in NL)
+
+**OSS Section (High Value >€150)**:
+7. OSS VAT to Pay (other EU countries)
+8. OSS VAT Returned (returns from other EU)
+9. Net OSS VAT
+
+**Duty Section**:
+10. Total Duty Returned (all countries, IE excluded)
+
+**Revenue Split**:
+11. Total VAT Returned (IOSS + NL + OSS)
+12. DR Fee (commission on VAT returns)
+13. PC Portion from VAT Returns
+14. PC Duty Revenue (100%)
+15. PC Total Revenue
+
+**Summary**:
+- Total Refunds to Process (VAT + Duty)
+- DR Revenue (commission)
+- PC Revenue (remainder + duty)
 
 **Important Notes**:
 - **VAT Refunds**: Go to customers, with DR taking 20-30% commission
