@@ -15,48 +15,30 @@ class HighValueProcessor:
 
     @staticmethod
     def process_high_value_data(df: pd.DataFrame, duty_dict: Dict[str, float]) -> list[Any]:
-        """
-        Process high value consignment data.
-
-        Args:
-            df: High value consignment DataFrame
-            duty_dict: Dictionary of duty rates by goods code
-
-        Returns:
-            List containing [vat_to_return_from_nl, DR_revenue, vat_difference_txt, vat_to_pay_total]
-        """
         df = HighValueProcessor.clean_columns(df)
+
+        # Calculate total VAT that was paid in NL by broker
+        vat_that_was_paid_by_broker_in_nl = HighValueProcessor.calculate_vat_paid_by_broker_in_nl(df)
 
         # Calculate import VAT that was paid by broker to return from NL
         vat_to_return_from_nl = HighValueProcessor.calculate_vat_to_return_from_nl(df)
 
-        # Calculate VAT per country to submit to NL
+        # Calculate VAT per country to submit to NL ( excluding NL shipments, as for them broker already paid vat )
         vat_per_country = HighValueProcessor.calculate_vat_per_country(df)
-        vat_to_pay_total = vat_per_country['Total VAT to Pay'].sum()
-
-        # Create VAT difference table
-        vat_difference_table = HighValueProcessor.create_vat_difference_table(vat_per_country)
-        vat_difference_payment_txt = HighValueProcessor.calculate_vat_difference_payment_txt(vat_difference_table)
 
         # Calculate VAT refunds for returned items
         return_vat_per_country = Services.calculate_return_vat_per_country(df)
 
         # Getting duty that should be returned for returned items
-        return_duty_amount, duty_returned_by_country = HighValueProcessor.calculate_duty_for_returned_items(
-            df, duty_dict
-        )
+        duty_returned_by_country = HighValueProcessor.calculate_duty_for_returned_items(df, duty_dict)
 
         # Merge duty and VAT refunds by country
         combined_refunds = HighValueProcessor.duty_vat_hv_merge(return_vat_per_country, duty_returned_by_country)
 
-        # Calculate DR revenue from high value returns
-        DR_revenue_hv, DR_revenue_table = HighValueProcessor.calculate_dr_revenue_from_hw_returns(combined_refunds)
-
         # Save reports to CSV files
-        Services.store_hv_data(df, vat_per_country, vat_difference_table, return_vat_per_country,
-                             combined_refunds, DR_revenue_table)
+        Services.store_hv_data(vat_per_country, combined_refunds)
 
-        return [[vat_to_return_from_nl, DR_revenue_hv, vat_difference_payment_txt, vat_to_pay_total], [vat_per_country, duty_returned_by_country, return_vat_per_country]]
+        return [vat_that_was_paid_by_broker_in_nl, vat_to_return_from_nl, vat_per_country, combined_refunds]
 
     @staticmethod
     def calculate_vat_difference_payment_txt(df: pd.DataFrame) -> str:
@@ -88,26 +70,6 @@ class HighValueProcessor:
 
         return vat_difference_table
 
-    @staticmethod
-    def calculate_dr_revenue_from_hw_returns(combined_refunds: pd.DataFrame) -> Tuple[float, pd.DataFrame]:
-        """Calculate DR revenue from high value returns (30% IE, 20% others)."""
-        revenue_df = combined_refunds.copy()
-
-        # Calculate revenue: 30% for Ireland (VAT only, no duty), 20% for others
-        revenue_df['Revenue'] = revenue_df.apply(
-            lambda row: row['Total VAT Refund'] * Config.get_commission_rate(row['Country'])
-            if row['Country'] in Config.DUTY_EXCLUDED_COUNTRIES
-            else row['Total Refund'] * Config.get_commission_rate(row['Country']),
-            axis=1
-        )
-
-        # Keep only Country and Revenue columns
-        result_df = revenue_df[['Country', 'Revenue']]
-
-        # Calculate total revenue
-        total_revenue = result_df['Revenue'].sum()
-
-        return total_revenue, result_df
 
     @staticmethod
     def duty_vat_hv_merge(vat_df: pd.DataFrame, duty_df: pd.DataFrame) -> pd.DataFrame:
@@ -150,7 +112,7 @@ class HighValueProcessor:
         return Services.calculate_vat_per_country(df)
 
     @staticmethod
-    def calculate_duty_for_returned_items(df: pd.DataFrame, duty_dict: Dict[str, float]) -> Tuple[float, pd.DataFrame]:
+    def calculate_duty_for_returned_items(df: pd.DataFrame, duty_dict: Dict[str, float]) -> pd.DataFrame:
         """Calculate duty refunds for returned items."""
         returned_df = df[df['Line Item Quantity Returned'] > 0].copy()
         
@@ -180,9 +142,7 @@ class HighValueProcessor:
 
         duty_by_country.columns = ['Country', 'Total Returned Value', 'Total Duty Returned']
 
-        total_duty = duty_by_country['Total Duty Returned'].sum()
-
-        return total_duty, duty_by_country
+        return duty_by_country
     
     @staticmethod
     def calculate_vat_to_return_from_nl(df: pd.DataFrame) -> float:
@@ -193,4 +153,11 @@ class HighValueProcessor:
         unique_consignments['VAT Amount'] = unique_consignments['Consignment Value'] * Config.NL_VAT_RATE
         total_nl_vat = unique_consignments['VAT Amount'].sum()
         return total_nl_vat
+
+    @staticmethod
+    def calculate_vat_paid_by_broker_in_nl(df: pd.DataFrame) -> float:
+        unique_consignments = df.drop_duplicates(subset=['MRN'])
+        unique_consignments['VAT Amount'] = unique_consignments['Consignment Value'] * Config.NL_VAT_RATE
+        total_vat_paid = unique_consignments['VAT Amount'].sum()
+        return total_vat_paid
 

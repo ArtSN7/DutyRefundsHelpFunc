@@ -13,33 +13,26 @@ class Services:
     """Shared service methods used across processors."""
 
     @staticmethod
-    def store_lv_data(lv_consignments, vat_per_country, return_vat_per_country, DR_revenue_table) -> None:
+    def store_lv_data(lv_vat_per_country, lv_return_vat_per_country) -> None:
         """Save low value consignment data to Excel files."""
         # Create data directory if it doesn't exist
         data_dir = Path(Config.DATA_DIR)
         data_dir.mkdir(exist_ok=True)
 
         # Save all dataframes to Excel format
-        lv_consignments.to_excel(data_dir / "lv_consignments_data.xlsx", index=False, engine='openpyxl')
-        vat_per_country.to_excel(data_dir / "lv_vat_per_country_summary.xlsx", index=False, engine='openpyxl')
-        return_vat_per_country.to_excel(data_dir / "lv_returned_vat_per_country_summary.xlsx", index=False, engine='openpyxl')
-        DR_revenue_table.to_excel(data_dir / "lv_DR_revenue_summary.xlsx", index=False, engine='openpyxl')
+        lv_vat_per_country.to_excel(data_dir / "lv_imported_vat_per_country_summary.xlsx", index=False, engine='openpyxl')
+        lv_return_vat_per_country.to_excel(data_dir / "lv_returned_vat_per_country_summary.xlsx", index=False, engine='openpyxl')
 
     @staticmethod
-    def store_hv_data(hv_consignments, vat_per_country, vat_difference_table, return_vat_per_country,
-                      combined_refunds, DR_revenue_table) -> None:
+    def store_hv_data(hv_vat_per_country,  hv_combined_refunds) -> None:
         """Save high value consignment data to Excel files."""
         # Create data directory if it doesn't exist
         data_dir = Path(Config.DATA_DIR)
         data_dir.mkdir(exist_ok=True)
 
         # Save all dataframes to Excel format
-        hv_consignments.to_excel(data_dir / "hv_consignments_data.xlsx", index=False, engine='openpyxl')
-        vat_per_country.to_excel(data_dir / "hv_vat_per_country_summary.xlsx", index=False, engine='openpyxl')
-        vat_difference_table.to_excel(data_dir / "hv_vat_difference_summary.xlsx", index=False, engine='openpyxl')
-        return_vat_per_country.to_excel(data_dir / "hv_returned_vat_per_country_summary.xlsx", index=False, engine='openpyxl')
-        combined_refunds.to_excel(data_dir / "hv_duty_and_vat_returned_values_summary.xlsx", index=False, engine='openpyxl')
-        DR_revenue_table.to_excel(data_dir / "hv_DR_revenue_summary.xlsx", index=False, engine='openpyxl')
+        hv_vat_per_country.to_excel(data_dir / "hv_imported_vat_per_country_summary.xlsx", index=False, engine='openpyxl')
+        hv_combined_refunds.to_excel(data_dir / "hv_duty_and_vat_returned_values_summary.xlsx", index=False, engine='openpyxl')
 
     @staticmethod
     def summary_table(lv_list, hv_list):
@@ -453,4 +446,193 @@ class Services:
         print(f"   📄 PC Duty Revenue: {vat_returns_dir / f'PC_DUTY_REVENUE_{period_str}.xlsx'}")
         
         return pc_detailed
+    
+    @staticmethod
+    def create_comprehensive_financial_breakdown(
+        lv_vat_per_country: pd.DataFrame,
+        lv_return_vat: pd.DataFrame,
+        hv_vat_to_return_from_nl: float,
+        hv_vat_per_country: pd.DataFrame,
+        hv_return_vat: pd.DataFrame,
+        hv_combined_refunds: pd.DataFrame,
+        lv_dr_revenue: float,
+        hv_dr_revenue: float,
+        return_period: str
+    ) -> pd.DataFrame:
+        """
+        Create comprehensive financial breakdown table with all key metrics.
+        
+        Args:
+            lv_vat_per_country: Low value VAT per country
+            lv_return_vat: Low value return VAT
+            hv_vat_to_return_from_nl: Import VAT to reclaim (21% for parcels to other EU)
+            hv_vat_per_country: High value VAT per country
+            hv_return_vat: High value return VAT
+            hv_combined_refunds: Combined duty and VAT refunds
+            lv_dr_revenue: DR revenue from LV
+            hv_dr_revenue: DR revenue from HV
+            return_period: Tax period
+            
+        Returns:
+            Comprehensive financial breakdown DataFrame
+        """
+        
+        # ==================== IOSS (LOW VALUE) ====================
+        # 1. Total IOSS VAT to pay for imports
+        ioss_vat_import = lv_vat_per_country['Total VAT to Pay'].sum()
+        
+        # 2. Total IOSS VAT for returns
+        ioss_vat_return = lv_return_vat['Total VAT Refund'].sum()
+        
+        # ==================== BROKER IMPORT VAT ====================
+        # 3. Total VAT broker paid when importing ALL HV goods to NL (21% on all HV parcels)
+        # This is calculated as 21% of total consignment value for ALL HV parcels
+        total_hv_consignment_value = hv_vat_per_country['Total Consignment Value'].sum()
+        broker_import_vat_paid = total_hv_consignment_value * Config.NL_VAT_RATE
+        
+        # 4. VAT to reclaim from broker (21% only for parcels that went to other EU, not NL)
+        # This is the hv_vat_to_return_from_nl which already excludes NL parcels
+        vat_to_reclaim_from_broker = hv_vat_to_return_from_nl
+        
+        # 5. VAT to return from NL parcels that were returned by customers
+        nl_hv_returns = hv_return_vat[
+            hv_return_vat['Country'] == 'NL'
+        ]['Total VAT Refund'].sum() if 'NL' in hv_return_vat['Country'].values else 0
+        
+        # ==================== OSS (HIGH VALUE) ====================
+        # 6. VAT to pay for OSS (other countries, excluding NL)
+        oss_vat_to_pay = hv_vat_per_country[
+            hv_vat_per_country['Country'] != 'NL'
+        ]['Total VAT to Pay'].sum() if len(hv_vat_per_country) > 0 else 0
+        
+        # 7. VAT returned from OSS countries (returns)
+        oss_vat_returned = hv_return_vat[
+            hv_return_vat['Country'] != 'NL'
+        ]['Total VAT Refund'].sum() if len(hv_return_vat) > 0 else 0
+        
+        # ==================== DUTY ====================
+        # 8. Total duty returned from OSS countries + NL (excluding IE)
+        total_duty_returned = sum([
+            hv_combined_refunds[hv_combined_refunds['Country'] == c]['Total Duty Returned'].sum()
+            for c in hv_combined_refunds['Country'].unique()
+            if c not in Config.DUTY_EXCLUDED_COUNTRIES
+        ]) if len(hv_combined_refunds) > 0 else 0
+        
+        # ==================== TOTALS ====================
+        # 9. Total VAT returned (OSS + NL + IOSS)
+        total_vat_returned = ioss_vat_return + nl_hv_returns + oss_vat_returned
+        
+        # 10. DR fee (commission on all VAT returns)
+        total_dr_fee = lv_dr_revenue + hv_dr_revenue
+        
+        # 11. PC gets the rest (VAT returns - DR fee) + 100% of duty
+        pc_vat_portion = total_vat_returned - total_dr_fee
+        pc_total = pc_vat_portion + total_duty_returned
+        
+        # Create breakdown table
+        breakdown_data = {
+            'Item': [
+                '1. IOSS VAT to Pay for Imports',
+                '2. IOSS VAT for Returns (Credit)',
+                '3. Net IOSS VAT',
+                '',
+                '4. Broker Import VAT Paid (21% on ALL HV parcels)',
+                '5. VAT to Reclaim from Broker (21% on parcels to other EU)',
+                '6. NL HV Returns VAT (parcels stayed in NL)',
+                '',
+                '7. OSS VAT to Pay (other EU countries)',
+                '8. OSS VAT Returned (returns from other EU)',
+                '9. Net OSS VAT',
+                '',
+                '10. Total Duty Returned (from all countries, IE excluded)',
+                '',
+                '11. Total VAT Returned (IOSS + NL + OSS)',
+                '12. DR Fee (commission on VAT returns)',
+                '13. PC Portion from VAT Returns',
+                '14. PC Duty Revenue (100%)',
+                '15. PC Total Revenue',
+                '',
+                'SUMMARY',
+                '• Total Refunds to Process',
+                '• DR Revenue',
+                '• PC Revenue'
+            ],
+            'Amount (€)': [
+                f'{ioss_vat_import:,.2f}',
+                f'{ioss_vat_return:,.2f}',
+                f'{ioss_vat_import - ioss_vat_return:,.2f}',
+                '',
+                f'{broker_import_vat_paid:,.2f}',
+                f'{vat_to_reclaim_from_broker:,.2f}',
+                f'{nl_hv_returns:,.2f}',
+                '',
+                f'{oss_vat_to_pay:,.2f}',
+                f'{oss_vat_returned:,.2f}',
+                f'{oss_vat_to_pay - oss_vat_returned:,.2f}',
+                '',
+                f'{total_duty_returned:,.2f}',
+                '',
+                f'{total_vat_returned:,.2f}',
+                f'{total_dr_fee:,.2f}',
+                f'{pc_vat_portion:,.2f}',
+                f'{total_duty_returned:,.2f}',
+                f'{pc_total:,.2f}',
+                '',
+                '',
+                f'{total_vat_returned + total_duty_returned:,.2f}',
+                f'{total_dr_fee:,.2f}',
+                f'{pc_total:,.2f}'
+            ],
+            'Description': [
+                'VAT collected on IOSS imports (≤€150)',
+                'VAT to refund for IOSS returns',
+                'Net IOSS VAT position',
+                '',
+                'Total import VAT paid by broker at 21% for ALL HV parcels',
+                'Reclaim 21% VAT only for parcels shipped to other EU (not NL)',
+                'Refund for returned parcels that stayed in NL',
+                '',
+                'VAT due for sales to other EU countries (at their rates)',
+                'VAT credit for returns from other EU countries',
+                'Net OSS VAT position',
+                '',
+                'Customs duty refunds (IE excluded - no duty reclaim)',
+                '',
+                'All VAT refunds combined',
+                'DR commission (20% general, 30% IE)',
+                'Remainder of VAT refunds to PC',
+                'PC gets 100% of duty refunds',
+                'Total revenue for Pro Carrier',
+                '',
+                '',
+                'Total VAT + Duty refunds to process',
+                'Duty Refunds company commission',
+                'Pro Carrier total share'
+            ]
+        }
+        
+        breakdown_df = pd.DataFrame(breakdown_data)
+        
+        # Save to vat_returns folder
+        vat_returns_dir = Path(Config.VAT_RETURNS_DIR)
+        vat_returns_dir.mkdir(exist_ok=True)
+        
+        period_str = return_period.replace(' ', '_')
+        breakdown_df.to_excel(
+            vat_returns_dir / f"COMPREHENSIVE_FINANCIAL_BREAKDOWN_{period_str}.xlsx",
+            index=False,
+            engine='openpyxl'
+        )
+        
+        print(f"   📄 Comprehensive Breakdown: {vat_returns_dir / f'COMPREHENSIVE_FINANCIAL_BREAKDOWN_{period_str}.xlsx'}")
+        
+        # Print key totals
+        print(f"\n📊 Financial Breakdown Summary:")
+        print(f"   💰 Total Refunds to Process: €{total_vat_returned + total_duty_returned:,.2f}")
+        print(f"   💼 DR Commission: €{total_dr_fee:,.2f}")
+        print(f"   🚚 PC Revenue: €{pc_total:,.2f}")
+        print(f"   📦 Broker Import VAT Paid (ALL HV): €{broker_import_vat_paid:,.2f}")
+        print(f"   📤 VAT to Reclaim (parcels to other EU): €{vat_to_reclaim_from_broker:,.2f}")
+        
+        return breakdown_df
 
