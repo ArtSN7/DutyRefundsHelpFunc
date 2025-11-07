@@ -13,17 +13,15 @@ class Services:
     """Shared service methods used across processors."""
 
     @staticmethod
-    def store_lv_data(lv_vat_per_country, lv_return_vat_per_country) -> None:
+    def store_lv_data(lv_vat_per_country) -> None:
         """Save low value consignment data to Excel files."""
         # Create data directory if it doesn't exist
         data_dir = Path(Config.DATA_DIR)
         data_dir.mkdir(exist_ok=True)
 
         # Save all dataframes to Excel format
-        lv_vat_per_country.to_excel(data_dir / "lv_imported_vat_per_country_summary.xlsx", index=False,
+        lv_vat_per_country.to_excel(data_dir / "lv_vat_per_country_summary.xlsx", index=False,
                                     engine='openpyxl')
-        lv_return_vat_per_country.to_excel(data_dir / "lv_returned_vat_per_country_summary.xlsx", index=False,
-                                           engine='openpyxl')
 
     @staticmethod
     def store_hv_data(hv_vat_per_country, hv_combined_refunds) -> None:
@@ -33,7 +31,7 @@ class Services:
         data_dir.mkdir(exist_ok=True)
 
         # Save all dataframes to Excel format
-        hv_vat_per_country.to_excel(data_dir / "hv_imported_vat_per_country_summary.xlsx", index=False,
+        hv_vat_per_country.to_excel(data_dir / "hv_vat_per_country_summary.xlsx", index=False,
                                     engine='openpyxl')
         hv_combined_refunds.to_excel(data_dir / "hv_duty_and_vat_returned_values_summary.xlsx", index=False,
                                      engine='openpyxl')

@@ -35,10 +35,29 @@ class HighValueProcessor:
         # Merge duty and VAT refunds by country
         combined_refunds = HighValueProcessor.duty_vat_hv_merge(return_vat_per_country, duty_returned_by_country)
 
+        combined_vat_per_country = HighValueProcessor.create_combined_vat_per_country(vat_per_country, return_vat_per_country)
+
         # Save reports to CSV files
-        Services.store_hv_data(vat_per_country, combined_refunds)
+        Services.store_hv_data(combined_vat_per_country, combined_refunds)
 
         return [vat_that_was_paid_by_broker_in_nl, vat_to_return_from_nl, vat_per_country, combined_refunds]
+
+    @staticmethod
+    def create_combined_vat_per_country(vat_per_country: pd.DataFrame, return_vat_per_country: pd.DataFrame) -> pd.DataFrame:
+        """Create combined VAT per country dataframe."""
+        combined_vat_per_country = pd.merge(
+            vat_per_country,
+            return_vat_per_country[['Country', 'Total VAT Refund']],
+            on='Country',
+            how='outer'
+        )
+
+        combined_vat_per_country.fillna(0, inplace=True)
+
+        combined_vat_per_country = combined_vat_per_country[combined_vat_per_country['Country'] != 'NL']
+        combined_vat_per_country['NET VAT'] = combined_vat_per_country['Total VAT to Pay'] - combined_vat_per_country['Total VAT Refund']
+
+        return combined_vat_per_country
 
     @staticmethod
     def calculate_vat_difference_payment_txt(df: pd.DataFrame) -> str:
@@ -115,7 +134,7 @@ class HighValueProcessor:
     def calculate_duty_for_returned_items(df: pd.DataFrame, duty_dict: Dict[str, float]) -> pd.DataFrame:
         """Calculate duty refunds for returned items."""
         returned_df = df[df['Line Item Quantity Returned'] > 0].copy()
-        
+
         # EXCLUDE IE - Duty cannot be reclaimed from Ireland
         returned_df = returned_df[~returned_df['Consignee Country'].isin(Config.DUTY_EXCLUDED_COUNTRIES)]
 
@@ -143,7 +162,7 @@ class HighValueProcessor:
         duty_by_country.columns = ['Country', 'Total Returned Value', 'Total Duty Returned']
 
         return duty_by_country
-    
+
     @staticmethod
     def calculate_vat_to_return_from_nl(df: pd.DataFrame) -> float:
         """Calculate total NL VAT to be returned."""

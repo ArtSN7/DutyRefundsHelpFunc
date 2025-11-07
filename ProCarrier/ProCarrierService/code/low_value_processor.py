@@ -25,10 +25,28 @@ class LowValueProcessor:
         vat_per_country = LowValueProcessor.calculate_vat_per_country(df)
         return_vat_per_country = LowValueProcessor.calculate_return_vat_per_country(df)
 
+        combined_vat_per_country = LowValueProcessor.create_combined_vat_per_country(vat_per_country, return_vat_per_country)
+
         # Save reports to CSV files
-        Services.store_lv_data(vat_per_country, return_vat_per_country)
+        Services.store_lv_data(combined_vat_per_country)
 
         return [vat_per_country, return_vat_per_country]
+
+    @staticmethod
+    def create_combined_vat_per_country(vat_per_country: pd.DataFrame, return_vat_per_country: pd.DataFrame) -> pd.DataFrame:
+        """Create combined VAT per country dataframe."""
+        combined_vat_per_country = pd.merge(
+            vat_per_country,
+            return_vat_per_country[['Country', 'Total VAT Refund']],
+            on='Country',
+            how='outer'
+        )
+
+        combined_vat_per_country.fillna(0, inplace=True)
+
+        combined_vat_per_country['NET VAT'] = combined_vat_per_country['Total VAT to Pay'] - combined_vat_per_country['Total VAT Refund']
+
+        return combined_vat_per_country
 
     @staticmethod
     def clean_columns(df: pd.DataFrame) -> pd.DataFrame:

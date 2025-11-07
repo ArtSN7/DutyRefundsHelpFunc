@@ -99,9 +99,9 @@ def process_data(file_name: str, data_type: str, output_folder: str = None):
 def main():
     """Default execution with hardcoded values."""
     process_data(
-        file_name=Config.DEFAULT_CSV_PATH,
-        data_type='csv',
-        output_folder='jul_sep_data'
+        file_name="../OCT DATA.xlsx",
+        data_type='xlsx',
+        output_folder='oct_data'
     )
 
 
