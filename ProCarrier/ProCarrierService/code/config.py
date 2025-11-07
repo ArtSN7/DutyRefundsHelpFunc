@@ -37,14 +37,14 @@ class Config:
 
     # ==================== FILE PATHS ====================
     # Input files
-    DEFAULT_CSV_PATH = "TED BAKER DUTY CLAIM BACK Jul-Sep v2.csv"
+    DEFAULT_CSV_PATH = "../JUL-SEP DATA.csv"
     DEFAULT_DUTY_EXCEL_PATH = "Duties Import Jan 99.xlsx"
     
     # Return period
     DEFAULT_RETURN_PERIOD = "Q3 2024"
     
     # Output directories
-    DATA_DIR = "./data/"
+    DATA_DIR = "../data/"
     VAT_RETURNS_DIR = "./vat_returns/"
 
     # ==================== COLUMN DEFINITIONS ====================

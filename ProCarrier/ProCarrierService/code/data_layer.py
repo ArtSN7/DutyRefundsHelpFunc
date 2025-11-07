@@ -1,6 +1,6 @@
 import pandas as pd
 from typing import Tuple
-from config import Config
+from ProCarrier.ProCarrierService.code.config import Config
 import warnings
 
 warnings.filterwarnings('ignore', category=pd.errors.SettingWithCopyWarning)
@@ -8,6 +8,28 @@ warnings.filterwarnings('ignore', category=pd.errors.SettingWithCopyWarning)
 
 class DataLayer:
     """Handles data loading, cleaning and preparation."""
+
+    @staticmethod
+    def load_excel(excel_path: str) -> Tuple[pd.DataFrame, pd.DataFrame]:
+        """
+        Load and prepare data from an Excel file.
+
+        Args:
+            excel_path: Path to the Excel file
+
+        Returns:
+            Tuple of (low_value_df, high_value_df)
+        """
+        df = pd.read_excel(excel_path, sheet_name='Sheet1')
+
+        # If multiple sheets were requested/returned, pick the first sheet's DataFrame
+        if isinstance(df, dict):
+            df = next(iter(df.values()))
+
+        df = DataLayer.clean_data(df)
+        df = DataLayer.add_calculated_fields(df)
+        low_value_df, high_value_df = DataLayer.separate_data(df, Config.CONSIGNMENT_THRESHOLD)
+        return low_value_df, high_value_df
 
     @staticmethod
     def load_data(csv_path: str) -> Tuple[pd.DataFrame, pd.DataFrame]:

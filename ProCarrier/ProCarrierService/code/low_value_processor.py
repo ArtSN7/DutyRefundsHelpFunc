@@ -1,8 +1,8 @@
 """Low value consignment processor (<=150€)."""
 
 import pandas as pd
-from typing import Tuple, Any
-from config import Config
+from typing import Any
+from ProCarrier.ProCarrierService.code.config import Config
 from services import Services
 
 import warnings

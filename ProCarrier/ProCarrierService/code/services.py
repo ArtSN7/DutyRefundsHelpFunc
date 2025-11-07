@@ -2,8 +2,7 @@
 
 import pandas as pd
 from pathlib import Path
-import os
-from config import Config
+from ProCarrier.ProCarrierService.code.config import Config
 
 import warnings
 
