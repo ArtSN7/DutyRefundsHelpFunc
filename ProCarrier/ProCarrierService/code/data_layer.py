@@ -11,15 +11,6 @@ class DataLayer:
 
     @staticmethod
     def load_excel(excel_path: str) -> Tuple[pd.DataFrame, pd.DataFrame]:
-        """
-        Load and prepare data from an Excel file.
-
-        Args:
-            excel_path: Path to the Excel file
-
-        Returns:
-            Tuple of (low_value_df, high_value_df)
-        """
         df = pd.read_excel(excel_path, sheet_name='Sheet1')
 
         # If multiple sheets were requested/returned, pick the first sheet's DataFrame
@@ -33,15 +24,6 @@ class DataLayer:
 
     @staticmethod
     def load_data(csv_path: str) -> Tuple[pd.DataFrame, pd.DataFrame]:
-        """
-        Load and prepare data from CSV file.
-
-        Args:
-            csv_path: Path to the CSV file
-
-        Returns:
-            Tuple of (low_value_df, high_value_df)
-        """
         df = pd.read_csv(csv_path)
         df = DataLayer.clean_data(df)
         df = DataLayer.add_calculated_fields(df)
@@ -50,7 +32,6 @@ class DataLayer:
 
     @staticmethod
     def clean_data(df: pd.DataFrame) -> pd.DataFrame:
-        """Clean and standardize data."""
         # Exclude IC and CH countries
         df = df[~df['Consignee Country'].isin(['IC', 'CH'])]
 

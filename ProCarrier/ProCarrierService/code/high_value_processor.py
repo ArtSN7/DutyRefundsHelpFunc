@@ -14,50 +14,148 @@ class HighValueProcessor:
     """Processes high value consignments (>150€)."""
 
     @staticmethod
-    def process_high_value_data(df: pd.DataFrame, duty_dict: Dict[str, float]) -> list[Any]:
+    def process_high_value_data(df: pd.DataFrame, duty_dict: Dict[str, float]) -> tuple[list[Any], Any]:
         df = HighValueProcessor.clean_columns(df)
 
-        # Calculate total VAT that was paid in NL by broker
-        vat_that_was_paid_by_broker_in_nl = HighValueProcessor.calculate_vat_paid_by_broker_in_nl(df)
+        # calculate duty paid first
+        df = HighValueProcessor.duty_paid(df, duty_dict)
 
-        # Calculate import VAT that was paid by broker to return from NL
-        vat_to_return_from_nl = HighValueProcessor.calculate_vat_to_return_from_nl(df)
+        # Separate HV consignments declared in IE vs NL
+        hv_declared_in_IE , hv_declared_in_NL = HighValueProcessor.separate_by_declaration_country(df)
 
-        # Calculate VAT per country to submit to NL ( excluding NL shipments, as for them broker already paid vat )
-        vat_per_country = HighValueProcessor.calculate_vat_per_country(df)
+        # ==================== HV DECLARED IN NL ==============================
+        nl_results = HighValueProcessor.hv_nl_processing(hv_declared_in_NL, duty_dict)
 
-        # Calculate VAT refunds for returned items
-        return_vat_per_country = Services.calculate_return_vat_per_country(df)
+        # ==================== HV DECLARED IN IE ==============================
+        ie_results = HighValueProcessor.hv_ie_processing(hv_declared_in_IE, duty_dict)
 
-        # Getting duty that should be returned for returned items
-        duty_returned_by_country = HighValueProcessor.calculate_duty_for_returned_items(df, duty_dict)
+        return (nl_results, ie_results)
 
-        # Merge duty and VAT refunds by country
-        combined_refunds = HighValueProcessor.duty_vat_hv_merge(return_vat_per_country, duty_returned_by_country)
-
-        combined_vat_per_country = HighValueProcessor.create_combined_vat_per_country(vat_per_country, return_vat_per_country)
-
-        # Save reports to CSV files
-        Services.store_hv_data(combined_vat_per_country, combined_refunds)
-
-        return [vat_that_was_paid_by_broker_in_nl, vat_to_return_from_nl, vat_per_country, combined_refunds]
 
     @staticmethod
-    def create_combined_vat_per_country(vat_per_country: pd.DataFrame, return_vat_per_country: pd.DataFrame) -> pd.DataFrame:
-        """Create combined VAT per country dataframe."""
+    def hv_ie_processing(hv_declared_in_IE: pd.DataFrame, duty_dict: Dict[str, float]) -> list[Any]:
+        return_rgr= HighValueProcessor.calculate_rgr_vat_return(hv_declared_in_IE, Config.VAT_RATES['IE']) # for rgr IE form
+        return_rgr['Total Refund'] = return_rgr['Total VAT Refund']
+
+        Services.store_ie_hv_data(return_rgr)
+
+        return [return_rgr]
+
+
+    @staticmethod
+    def hv_nl_processing(hv_declared_in_NL: pd.DataFrame, duty_dict: Dict[str, float]) -> list[Any]:
+        # Calculate import VAT that was paid by broker in NL
+        vat_that_was_paid_by_broker_in_nl = HighValueProcessor.calculate_vat_paid_by_broker_in_nl(hv_declared_in_NL) # for summary
+
+        # Calculate import VAT that was paid by broker to return from NL
+        vat_to_return_from_nl = HighValueProcessor.calculate_vat_to_return_from_nl(hv_declared_in_NL) # for dutch vat form
+
+        # Calculate VAT per country to submit to NL for OSS ( excluding NL shipments, as for them broker already paid vat )
+        vat_per_country = HighValueProcessor.calculate_vat_per_country(hv_declared_in_NL) # for oss form import
+
+        # calculate return VAT per country to subtract from OSS declaration as returned
+        return_vat_per_country = HighValueProcessor.calculate_return_vat_per_country(hv_declared_in_NL) # for oss form returns
+
+        # combine both to create final vat per country for oss form
+        combined_vat_per_country = HighValueProcessor.create_combined_vat_per_country(vat_per_country, return_vat_per_country)
+
+        # Calculate VAT refunds for returned items for RGR NL form ( based on imported vat and duty paid )
+        return_rgr= HighValueProcessor.calculate_rgr_vat_return(hv_declared_in_NL, Config.VAT_RATES['NL']) # for rgr nl form
+        duty_returned_by_country = HighValueProcessor.calculate_duty_for_returned_items(hv_declared_in_NL, duty_dict)
+        # Merge duty and VAT refunds by country
+        combined_refunds = HighValueProcessor.duty_vat_hv_merge(return_rgr, duty_returned_by_country)
+
+        # Save reports to CSV files
+        Services.store_hv_data(combined_vat_per_country, combined_refunds) # ALSO NEED TO PRODUCE A RGR FILE FOR EACH RETURNED PARCEL
+
+        return [vat_that_was_paid_by_broker_in_nl, vat_to_return_from_nl, combined_vat_per_country, combined_refunds]
+
+
+    @staticmethod
+    def calculate_rgr_vat_return(df: pd.DataFrame, vat_rate : float) -> pd.DataFrame:
+        """Calculate VAT refunds for returned items per country."""
+        # Filter rows where items were returned
+        returned_df = df[df['Line Item Quantity Returned'] > 0].copy()
+
+        # Calculate total returned value for each line item
+        returned_df['Returned Item Value'] = (
+                returned_df['Line Item Quantity Returned'] *
+                returned_df['Line Item Unit Price']
+        )
+
+        # Calculate VAT refund for each returned item
+        returned_df['VAT Refund'] = returned_df['Returned Item Value'] * vat_rate
+
+        # Group by Country and VAT Rate
+        summary = returned_df.groupby(['Consignee Country', 'VAT Rate']).agg({
+            'Returned Item Value': 'sum',
+            'VAT Refund': 'sum'
+        }).reset_index()
+
+        # Rename columns for clarity
+        summary.columns = ['Country', 'VAT Rate', 'Total Returned Value', 'Total VAT Refund']
+
+        return summary
+
+
+    @staticmethod
+    def create_combined_vat_per_country(vat_per_country: pd.DataFrame,
+                                        return_vat_per_country: pd.DataFrame) -> pd.DataFrame:
         combined_vat_per_country = pd.merge(
             vat_per_country,
             return_vat_per_country[['Country', 'Total VAT Refund']],
             on='Country',
             how='outer'
         )
-
-        combined_vat_per_country.fillna(0, inplace=True)
-
-        combined_vat_per_country = combined_vat_per_country[combined_vat_per_country['Country'] != 'NL']
+        # Fill NaN values with 0
+        combined_vat_per_country = combined_vat_per_country.fillna({
+            'VAT Rate': 0,
+            'Total Consignment Value': 0,
+            'Total VAT to Pay': 0,
+            'Total VAT Refund': 0
+        })
         combined_vat_per_country['NET VAT'] = combined_vat_per_country['Total VAT to Pay'] - combined_vat_per_country['Total VAT Refund']
 
-        return combined_vat_per_country
+        return combined_vat_per_country[['Country', 'VAT Rate', 'Total VAT to Pay', 'Total VAT Refund', 'NET VAT']]
+
+
+    @staticmethod
+    def calculate_return_vat_per_country(df: pd.DataFrame) -> pd.DataFrame:
+        """Calculate VAT refunds for returned items."""
+        df = df[df['Consignee Country'] != 'NL']  # Exclude NL shipments
+        return Services.calculate_return_vat_per_country(df)
+
+
+    @staticmethod
+    def duty_paid(df: pd.DataFrame, duty_dict: Dict[str, float]) -> pd.DataFrame:
+        """Calculate duty paid for high value consignments."""
+        # Extract first 4 digits from HS CODE
+        df['Goods_Code_4'] = df['HS CODE'].astype(str).str[:4]
+
+        # Map duty rates
+        df['Duty Rate'] = df['Goods_Code_4'].map(duty_dict)
+
+        # Calculate item value
+        df['Item Value'] = (
+            df['Line Item Quantity Imported'] *
+            df['Line Item Unit Price']
+        )
+
+        # Calculate Duty
+        df['Duty'] = df['Item Value'] * df['Duty Rate']
+
+        return df
+
+
+    @staticmethod
+    def separate_by_declaration_country(df: pd.DataFrame) -> tuple[pd.DataFrame, pd.DataFrame]:
+        df['decl_country'] = df['MRN'].str[2:4].str.upper()
+        hv_declared_in_IE = df[df['decl_country'] == 'IE'].copy()
+        hv_declared_in_nl = df[df['decl_country'] != 'IE'].copy()
+        hv_declared_in_IE.drop(columns=['decl_country'], inplace=True)
+        hv_declared_in_nl.drop(columns=['decl_country'], inplace=True)
+        return hv_declared_in_IE, hv_declared_in_nl
+
 
     @staticmethod
     def calculate_vat_difference_payment_txt(df: pd.DataFrame) -> str:
@@ -117,6 +215,8 @@ class HighValueProcessor:
             'Total VAT Refund', 'Total Duty Returned', 'Total Refund'
         ]]
 
+        merged_df['VAT Rate'] = 0.21
+
         return merged_df
 
     @staticmethod
@@ -129,6 +229,7 @@ class HighValueProcessor:
         """Calculate VAT per country."""
         df = df[df['Consignee Country'] != 'NL']  # Exclude NL shipments
         return Services.calculate_vat_per_country(df)
+
 
     @staticmethod
     def calculate_duty_for_returned_items(df: pd.DataFrame, duty_dict: Dict[str, float]) -> pd.DataFrame:
@@ -169,14 +270,14 @@ class HighValueProcessor:
         unique_consignments = df.drop_duplicates(subset=['MRN'])
         # remove everything shipped to NL, as VAT was already been paid
         unique_consignments = unique_consignments[unique_consignments['Consignee Country'] != 'NL']
-        unique_consignments['VAT Amount'] = unique_consignments['Consignment Value'] * Config.NL_VAT_RATE
+        unique_consignments['VAT Amount'] = ( unique_consignments['Consignment Value'] + unique_consignments['Duty'] ) * Config.VAT_RATES['NL']
         total_nl_vat = unique_consignments['VAT Amount'].sum()
         return total_nl_vat
 
     @staticmethod
     def calculate_vat_paid_by_broker_in_nl(df: pd.DataFrame) -> float:
         unique_consignments = df.drop_duplicates(subset=['MRN'])
-        unique_consignments['VAT Amount'] = unique_consignments['Consignment Value'] * Config.NL_VAT_RATE
+        unique_consignments['VAT Amount'] = ( unique_consignments['Consignment Value'] + unique_consignments['Duty'] ) * Config.VAT_RATES['NL']
         total_vat_paid = unique_consignments['VAT Amount'].sum()
         return total_vat_paid
 
