@@ -10,7 +10,14 @@
             </Attribute>
           </value>
         </entry>
-        <entry key="/ProCarrier/ProCarrierService/code_test/OSS VAT Return Guide.md">
+        <entry key="/Samos/samos_invoice_detail.csv">
+          <value>
+            <Attribute>
+              <option name="separator" value="," />
+            </Attribute>
+          </value>
+        </entry>
+        <entry key="/Samos/samos_orders_summary.csv">
           <value>
             <Attribute>
               <option name="separator" value="," />
