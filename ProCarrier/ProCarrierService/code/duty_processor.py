@@ -6,13 +6,12 @@ import re
 from typing import Dict
 
 import warnings
+
 warnings.filterwarnings('ignore', category=pd.errors.SettingWithCopyWarning)
 
 
 class DutyProcessor:
     """Processes duty data from Excel files and calculates duty rates."""
-
-
 
     @staticmethod
     def process_duty_data(df: pd.DataFrame) -> Dict[str, float]:
@@ -75,4 +74,3 @@ class DutyProcessor:
                 return np.nan
         # No quantitative value found
         return np.nan
-
